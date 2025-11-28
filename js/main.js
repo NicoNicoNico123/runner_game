@@ -3,6 +3,9 @@ import { Player } from './Player.js';
 import { Camera } from './Camera.js';
 import { particles, createParticles } from './Particle.js';
 import { generateLevel } from './LevelGenerator.js';
+import { drawBackground, drawGoal } from './Backgrounds.js';
+import { drawTraps } from './TrapRenderer.js';
+import { saveScore, loadLeaderboard } from './firebase.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -16,6 +19,8 @@ let frameCount = 0;
 let lastTime = 0;
 let currentLevelIndex = 0;
 let levelData = null;
+let startTime = 0; // Timestamp when game started
+let totalElapsedTime = 0; // Accumulated time for previous attempts/levels
 
 const player = new Player();
 const camera = new Camera();
@@ -59,7 +64,12 @@ function levelComplete() {
     if (nextIdx >= LEVELS.length) {
         // Victory
         document.querySelector('#level-complete-screen h1').innerText = "VAPORWAVE MASTER";
-        document.querySelector('#level-complete-screen h2').innerText = "ALL CITIES CONQUERED";
+        const finalTime = Date.now() - startTime + totalElapsedTime; // Current run + accumulated
+        const formattedTime = formatTime(finalTime);
+        document.querySelector('#level-complete-screen h2').innerText = `ALL CITIES CONQUERED\nTIME: ${formattedTime}`;
+        
+        saveScore(finalTime); // Save to Firebase
+
         const btn = document.getElementById('next-level-btn');
         btn.innerText = "RESTART SIMULATION";
         btn.onclick = () => location.reload();
@@ -78,6 +88,12 @@ function update(dt) {
 
     // Pass die as callback
     player.update(dt, config.gravity, levelData.platforms, die, frameCount);
+    
+    // Fall death check
+    if (player.y > GAME_HEIGHT) {
+        die();
+    }
+    
     camera.update(player.x);
 
     // Trap Collisions
@@ -127,56 +143,6 @@ function update(dt) {
     document.getElementById('progress-fill').style.width = `${progress}%`;
 }
 
-function drawCityLayer(speed, heightVar, widthVar) {
-    const offset = -(camera.x * speed) % 2000;
-    const yBase = GAME_HEIGHT;
-    
-    ctx.beginPath();
-    ctx.moveTo(offset - 100, yBase);
-    
-    // Pseudo-random city blocks based on Math.sin to be deterministic without storage
-    for(let x = -100; x < GAME_WIDTH + 200; x+= widthVar) {
-        let h = Math.abs(Math.sin(x + currentLevelIndex)) * heightVar + 50;
-        ctx.lineTo(x + offset, yBase - h);
-        ctx.lineTo(x + widthVar + offset, yBase - h);
-    }
-    
-    ctx.lineTo(GAME_WIDTH + offset + 200, yBase);
-    ctx.fill();
-}
-
-function drawBackground() {
-    const config = LEVELS[currentLevelIndex];
-    
-    // Sky gradient
-    const grad = ctx.createLinearGradient(0, 0, 0, GAME_HEIGHT);
-    grad.addColorStop(0, config.bgColors[0]);
-    grad.addColorStop(0.5, config.bgColors[1]);
-    grad.addColorStop(1, config.bgColors[2]);
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-    // Retro Sun
-    const sunY = 150;
-    ctx.fillStyle = `rgba(255, 42, 109, 0.2)`; 
-    ctx.beginPath();
-    ctx.arc(GAME_WIDTH / 2, sunY + (camera.x * 0.05) % 10, 100, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Parallax City Layers
-    // Far (Silhouettes)
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    drawCityLayer(0.1, 100, 50);
-
-    // Mid
-    ctx.fillStyle = 'rgba(20, 10, 30, 0.8)';
-    drawCityLayer(0.3, 150, 100);
-
-    // Near
-    ctx.fillStyle = 'rgba(5, 5, 10, 0.9)';
-    drawCityLayer(0.6, 200, 150);
-}
-
 function drawWorld() {
     const camX = Math.floor(camera.x);
 
@@ -208,33 +174,10 @@ function drawWorld() {
         ctx.restore();
     });
 
-    // Draw Traps
-    levelData.traps.forEach(t => {
-        if (t.destroyed || t.x + t.w < camX || t.x > camX + GAME_WIDTH) return;
 
-        // Glitch effect for traps
-        const jitter = Math.random() * 2;
-        
-        if (t.type === 'small') {
-            // Garbage/Crates/Barrier
-            ctx.fillStyle = '#ff2a6d'; // Pink danger
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#ff2a6d';
-            ctx.fillRect(t.x - camX + jitter, t.y, t.w, t.h);
-            
-            // X icon
-            ctx.fillStyle = '#000';
-            ctx.font = '20px Arial';
-            ctx.fillText("X", t.x - camX + 5, t.y + 20);
-        } else {
-            // Poles/Statues
-            ctx.fillStyle = '#05d9e8'; // Blue danger
-            ctx.shadowBlur = 10;
-            ctx.shadowColor = '#05d9e8';
-            ctx.fillRect(t.x - camX + jitter, t.y, t.w, t.h);
-        }
-        ctx.shadowBlur = 0;
-    });
+    // Draw Traps
+    const levelName = LEVELS[currentLevelIndex].name;
+    drawTraps(ctx, camera, levelData, levelName, frameCount);
 
     // Draw Powerups
     levelData.powerups.forEach(p => {
@@ -254,20 +197,7 @@ function drawWorld() {
     });
 
     // Draw Goal
-    const gx = levelData.goalX - camX;
-    if (gx < GAME_WIDTH) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
-        ctx.fillRect(gx, 0, 100, GAME_HEIGHT);
-        
-        // Portal effect
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 5;
-        ctx.strokeRect(gx, 100, 100, 300);
-        
-        ctx.font = '20px "Press Start 2P"';
-        ctx.fillStyle = '#fff';
-        ctx.fillText("GOAL", gx + 15, 250);
-    }
+    drawGoal(ctx, camera, levelData, levelName, GAME_HEIGHT, frameCount);
 }
 
 function draw() {
@@ -275,7 +205,7 @@ function draw() {
     ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
 
     // Background
-    drawBackground();
+    drawBackground(ctx, camera, currentLevelIndex, GAME_WIDTH, GAME_HEIGHT, frameCount);
 
     // World (Platforms, Traps)
     if (currentState !== STATE.START) {
@@ -307,14 +237,34 @@ function gameLoop(timestamp) {
 
 // Global actions exposed to UI
 function startGame() {
-    currentLevelIndex = 0;
+    const selector = document.getElementById('level-select');
+    currentLevelIndex = parseInt(selector.value, 10) || 0;
     initLevel();
     currentState = STATE.PLAYING;
+    startTime = Date.now();
+    totalElapsedTime = 0; // Reset total time on fresh start
     document.getElementById('start-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
 }
 
 function nextLevel() {
+    // Add time spent in this level to total
+    // Note: simple implementation - better would be to track effective play time.
+    // Here we just capture wall clock time since start of level
+    // But wait, we want continuous time.
+    // We don't need to touch startTime/totalElapsedTime here if we just keep measuring against original startTime.
+    // HOWEVER, retryLevel resets startTime. So we need a robust strategy.
+    
+    // Strategy: Maintain 'startTime' as the start of the CURRENT run segment.
+    // When we complete a level, we add (Date.now() - startTime) to totalElapsedTime.
+    // Then reset startTime for next level? 
+    // Actually, simpler: Keep startTime as "Session Start".
+    // If we retry, we don't reset Session Start? 
+    // Requirement: "counting should be start count from insert coin, even Again still count in it"
+    // So: totalElapsedTime is 0 at INSERT COIN.
+    // startTime is set at INSERT COIN.
+    // Retrying a level just continues the clock.
+    
     currentLevelIndex++;
     if (currentLevelIndex < LEVELS.length) {
         initLevel();
@@ -327,8 +277,39 @@ function nextLevel() {
 function retryLevel() {
     initLevel(); // Restart current
     currentState = STATE.PLAYING;
+    // Do NOT reset timer. "Even Again still count in it"
     document.getElementById('game-over-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
+}
+
+function backToStart() {
+    currentState = STATE.START;
+    totalElapsedTime = 0; // Reset on back to start
+    startTime = 0;
+    document.getElementById('game-over-screen').classList.add('hidden');
+    document.getElementById('start-screen').classList.remove('hidden');
+    document.getElementById('hud').classList.add('hidden');
+}
+
+function toggleLeaderboard() {
+    const lb = document.getElementById('leaderboard-container');
+    if (lb.classList.contains('hidden')) {
+        lb.classList.remove('hidden');
+        loadLeaderboard();
+    } else {
+        lb.classList.add('hidden');
+    }
+}
+
+function formatTime(ms) {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    const millis = Math.floor((ms % 1000) / 10);
+    return `${pad(minutes)}:${pad(seconds)}:${pad(millis)}`;
+}
+
+function pad(n) {
+    return n < 10 ? '0' + n : n;
 }
 
 // Event Listeners
@@ -349,7 +330,18 @@ canvas.addEventListener('touchstart', (e) => {
 document.getElementById('start-btn').addEventListener('click', startGame);
 document.getElementById('next-level-btn').addEventListener('click', nextLevel);
 document.getElementById('retry-btn').addEventListener('click', retryLevel);
+document.getElementById('back-to-start-btn').addEventListener('click', backToStart);
+document.getElementById('leaderboard-btn').addEventListener('click', toggleLeaderboard);
+document.getElementById('close-leaderboard-btn').addEventListener('click', toggleLeaderboard);
+
+// Secret Level Select Trigger
+let incredibleClickCount = 0;
+document.getElementById('incredible-trigger').addEventListener('click', () => {
+    incredibleClickCount++;
+    if (incredibleClickCount === 3) {
+        document.querySelector('.level-select-container').classList.remove('hidden');
+    }
+});
 
 // Start Loop
 requestAnimationFrame(gameLoop);
-

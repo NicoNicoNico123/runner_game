@@ -27,8 +27,26 @@
         <h2>VAPOR CITY RUNNER</h2>
         <p>TAP or SPACE to Jump.</p>
         <p>Avoid solid traps and gaps.</p>
-        <p>Collect the <span style="color:yellow">★</span> for INCREDIBLE MODE.</p>
+        <p id="incredible-trigger" style="cursor: pointer; user-select: none;">Collect the <span style="color:yellow">★</span> for INCREDIBLE MODE.</p>
+        
+        <div class="level-select-container hidden">
+            <label for="level-select" style="font-size: 0.8rem; color: #aaa;">START LEVEL:</label>
+            <select id="level-select" class="level-select">
+                <option value="0">HONG KONG (Easy)</option>
+                <option value="1">TOKYO (Medium)</option>
+                <option value="2">PARIS (Hard)</option>
+            </select>
+        </div>
+
         <button class="btn" id="start-btn">INSERT COIN</button>
+        
+        <button class="btn" id="leaderboard-btn" style="font-size: 0.8rem; padding: 10px 20px; margin-top: 10px;">LEADERBOARD</button>
+
+        <div id="leaderboard-container" class="hidden" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.9); padding: 20px; border: 2px solid var(--neon-blue); z-index: 100; min-width: 300px;">
+            <h3 style="color: var(--neon-blue); margin-top: 0;">LEADERBOARD</h3>
+            <div id="leaderboard-list" style="margin-bottom: 20px;">Loading...</div>
+            <button class="btn" id="close-leaderboard-btn" style="font-size: 0.8rem; padding: 5px 10px;">CLOSE</button>
+        </div>
     </div>
 
     <!-- Level Complete Screen -->
@@ -42,10 +60,16 @@
     <div id="game-over-screen" class="hidden">
         <h1 style="font-size: 3rem; color: red; text-shadow: 0 0 20px red;">SYSTEM CRASH</h1>
         <p class="blink">CONNECTION LOST</p>
-        <button class="btn" id="retry-btn">REBOOT</button>
+        <button class="btn" id="retry-btn">AGAIN</button>
+        <button class="btn" id="back-to-start-btn">Return Start Screen</button>
     </div>
 </div>
 
-<script type="module" src="js/main.js"></script>
+    <script type="module">
+        // Firebase configuration would go here. 
+        // Since I don't have the actual firebase config from the user, 
+        // I will create a placeholder in js/firebase.js and import it.
+    </script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>

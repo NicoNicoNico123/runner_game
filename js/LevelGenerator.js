@@ -29,7 +29,13 @@ export function generateLevel(levelConfig) {
         const char = mapStr[col];
         const x = col * tileSize;
 
-        if (char === '.' || char === 'x' || char === 'X' || char === '*' || char === 'G') {
+        // Determine if we should draw ground
+        // ' ' (space) or '_' means GAP - no ground
+        // Everything else usually has ground unless specified otherwise
+        
+        const isGap = (char === ' ' || char === '_');
+        
+        if (!isGap) {
             // Ground
             platforms.push({ x: x, y: groundY, w: tileSize + 1, h: 60, type: 'ground' });
         }

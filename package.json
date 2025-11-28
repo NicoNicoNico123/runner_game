@@ -1,0 +1,17 @@
+{
+  "name": "runner_game",
+  "version": "1.0.0",
+  "description": "A retro-styled endless runner game built with HTML5 Canvas.",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^7.2.4"
+  }
+}

@@ -30,7 +30,7 @@ export async function saveScore(timeMs) {
     try {
         const name = prompt("ENTER INITIALS FOR LEADERBOARD:", "AAA") || "UNK";
         await addDoc(collection(db, "leaderboard"), {
-            name: name.substring(0, 3).toUpperCase(),
+            name: name.substring(0, 9).toUpperCase(),
             time: timeMs,
             date: new Date()
         });
@@ -51,14 +51,35 @@ export async function loadLeaderboard() {
     list.innerHTML = "Loading...";
     
     try {
-        const q = query(collection(db, "leaderboard"), orderBy("time", "asc"), limit(5));
+        const q = query(collection(db, "leaderboard"), orderBy("time", "asc"), limit(10));
         const querySnapshot = await getDocs(q);
         
-        let html = "<ol style='list-style: none; padding: 0;'>";
+        let html = "<ol class='leaderboard-list'>";
+        let rank = 1;
         querySnapshot.forEach((doc) => {
             const data = doc.data();
             const timeStr = formatTime(data.time);
-            html += `<li style="margin-bottom: 5px;">${data.name} - ${timeStr}</li>`;
+            
+            let prefix = `<span class="rank-num">${rank}.</span>`;
+            let styleClass = "";
+            
+            if (rank === 1) {
+                prefix = `<span class="trophy">🏆</span>`;
+                styleClass = "rank-1";
+            } else if (rank === 2) {
+                prefix = `<span class="trophy">🥈</span>`;
+                styleClass = "rank-2";
+            } else if (rank === 3) {
+                prefix = `<span class="trophy">🥉</span>`;
+                styleClass = "rank-3";
+            }
+            
+            html += `<li class="leaderboard-item ${styleClass}">
+                <div class="lb-rank">${prefix}</div>
+                <div class="lb-name">${data.name}</div>
+                <div class="lb-time">${timeStr}</div>
+            </li>`;
+            rank++;
         });
         html += "</ol>";
         list.innerHTML = html;

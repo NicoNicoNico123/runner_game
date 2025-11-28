@@ -6,6 +6,7 @@ import { generateLevel } from './LevelGenerator.js';
 import { drawBackground, drawGoal } from './Backgrounds.js';
 import { drawTraps } from './TrapRenderer.js';
 import { saveScore, loadLeaderboard } from './firebase.js';
+import { EyeController } from './EyeController.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
@@ -24,6 +25,12 @@ let totalElapsedTime = 0; // Accumulated time for previous attempts/levels
 
 const player = new Player();
 const camera = new Camera();
+const eyeController = new EyeController(() => {
+    if (currentState === STATE.PLAYING) handleInput();
+});
+
+// Init Eye Controller (load model)
+eyeController.init();
 
 function initLevel() {
     const config = LEVELS[currentLevelIndex];
@@ -328,6 +335,13 @@ canvas.addEventListener('touchstart', (e) => {
 }, {passive: false});
 
 document.getElementById('start-btn').addEventListener('click', startGame);
+document.getElementById('eye-control-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('eye-control-btn');
+    btn.innerText = "LOADING...";
+    btn.disabled = true;
+    await eyeController.startCamera();
+    btn.innerText = "EYE CONTROL ENABLED";
+});
 document.getElementById('next-level-btn').addEventListener('click', nextLevel);
 document.getElementById('retry-btn').addEventListener('click', retryLevel);
 document.getElementById('back-to-start-btn').addEventListener('click', backToStart);

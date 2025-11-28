@@ -14,7 +14,7 @@ export const LEVELS = [
         name: "HONG KONG",
         sub: "NEON HARBOR",
         theme: "pink",
-        speed: 7.0,
+        speed: 8,
         gravity: 0.6,
         jumpForce: -13,
         bgColors: ['#2b003b', '#48005f', '#1a0b2e'], // Deep purples
@@ -38,7 +38,7 @@ export const LEVELS = [
         name: "PARIS",
         sub: "SYNTH GOTHIC",
         theme: "gold",
-        speed: 10,
+        speed: 11,
         gravity: 0.7,
         jumpForce: -14,
         bgColors: ['#2e0b0b', '#5f1212', '#140000'], // Deep reds

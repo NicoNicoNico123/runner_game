@@ -13,9 +13,16 @@ export function generateLevel(levelConfig) {
     // Construct string map
     let mapStr = "................"; // Safe start
     
-    // Repeat patterns to make level long enough (~30 seconds)
+    // Repeat patterns to make level long enough
     const pattern = MAP_PATTERNS[levelConfig.layout];
-    const repeats = 15; // Rough length
+    
+    let repeats = 15; // Default length
+    if (levelConfig.duration) {
+        const speedPxPerSec = levelConfig.speed * 60; // Speed * 60fps
+        const totalDist = speedPxPerSec * levelConfig.duration;
+        const patternChunkLen = pattern[0].length * tileSize;
+        repeats = Math.ceil(totalDist / patternChunkLen);
+    }
     
     for(let i=0; i<repeats; i++) {
         mapStr += pattern[i % pattern.length];

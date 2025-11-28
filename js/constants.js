@@ -19,7 +19,8 @@ export const LEVELS = [
         jumpForce: -13,
         bgColors: ['#2b003b', '#48005f', '#1a0b2e'], // Deep purples
         traps: ["bamboo", "ac_unit"],
-        layout: "easy"
+        layout: "easy",
+        duration: 20 // Seconds
     },
     {
         name: "TOKYO",
@@ -30,7 +31,8 @@ export const LEVELS = [
         jumpForce: -13.5,
         bgColors: ['#001e42', '#004269', '#000814'], // Deep blues
         traps: ["vending", "billboard"],
-        layout: "medium"
+        layout: "medium",
+        duration: 25
     },
     {
         name: "PARIS",
@@ -59,11 +61,11 @@ export const MAP_PATTERNS = {
     medium: [
         ".......___......................",
         ".......x..........x.............",
-        "....x.......X.......__..........",
+        "....x...............__..........",
         "..........x.....................",
         "............__.....x.....x......",
         "...............x................",
-        "....X.........X.......x.........",
+        "....X.................x.........",
         "..........x........X............",
         ".......__..............*........",
         "..x.............x...............",

@@ -8,35 +8,75 @@ export class EyeController {
         this.lastVideoTime = -1;
         this.running = false;
         this.loaded = false;
+        this._initPromise = null;
         this.blinkThreshold = 0.5; // Threshold for blink detection
         this.isBlinking = false;
     }
 
     async init() {
-        try {
-            const filesetResolver = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
-            );
-            this.faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-                baseOptions: {
-                    modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
-                    delegate: "GPU"
-                },
-                outputFaceBlendshapes: true,
-                runningMode: "VIDEO",
-                numFaces: 1
-            });
-            this.loaded = true;
-            console.log("FaceLandmarker loaded");
-        } catch (e) {
-            console.error("Failed to load FaceLandmarker:", e);
-        }
+        if (this._initPromise) return this._initPromise;
+        this._initPromise = (async () => {
+            try {
+                // IMPORTANT: keep the WASM bundle version in sync with the JS import version.
+                const filesetResolver = await FilesetResolver.forVisionTasks(
+                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+                );
+
+                // Mobile Chrome often fails GPU delegate (or float16) depending on device.
+                // Try GPU+float16 first, then fall back to CPU+float32.
+                try {
+                    this.faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                        baseOptions: {
+                            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task`,
+                            delegate: "GPU"
+                        },
+                        outputFaceBlendshapes: true,
+                        runningMode: "VIDEO",
+                        numFaces: 1
+                    });
+                } catch (gpuErr) {
+                    console.warn("FaceLandmarker GPU init failed; falling back to CPU/float32", gpuErr);
+                    this.faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+                        baseOptions: {
+                            modelAssetPath: `https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float32/1/face_landmarker.task`,
+                            delegate: "CPU"
+                        },
+                        outputFaceBlendshapes: true,
+                        runningMode: "VIDEO",
+                        numFaces: 1
+                    });
+                }
+
+                this.loaded = true;
+                console.log("FaceLandmarker loaded");
+                return true;
+            } catch (e) {
+                this.loaded = false;
+                console.error("Failed to load FaceLandmarker:", e);
+                return false;
+            }
+        })();
+
+        return this._initPromise;
     }
 
     async startCamera() {
+        // Camera requires a secure context on mobile (HTTPS).
+        if (!window.isSecureContext) {
+            alert("Eye Control needs HTTPS on mobile (camera access is blocked on non-secure pages).");
+            return false;
+        }
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+            alert("Camera API not available in this browser/device.");
+            return false;
+        }
+
+        // Ensure model is ready (mobile networks can be slow).
+        await this.init();
         if (!this.loaded) {
-            console.warn("FaceLandmarker not loaded yet");
-            return;
+            alert("Eye Control model failed to load. Try refreshing on a stronger connection.");
+            return false;
         }
 
         const cameraPanel = document.getElementById('camera-panel');
@@ -44,7 +84,7 @@ export class EyeController {
         if (!preview) {
             console.error("cameraPreview element not found");
             alert("Camera preview element missing from page.");
-            return;
+            return false;
         }
 
         // If already running, just ensure the panel is visible.
@@ -53,13 +93,14 @@ export class EyeController {
                 cameraPanel.classList.remove('hidden');
                 cameraPanel.setAttribute('aria-hidden', 'false');
             }
-            return;
+            return true;
         }
 
         // Use the visible preview video element so mobile users can see the camera feed.
         this.video = preview;
         this.video.muted = true;
         this.video.playsInline = true;
+        this.video.setAttribute('playsinline', 'true');
 
         try {
             let stream;
@@ -102,9 +143,11 @@ export class EyeController {
             this.lastVideoTime = -1;
             this.running = true;
             this.predict();
+            return true;
         } catch (e) {
             console.error("Error accessing webcam:", e);
             alert("Could not access webcam. Please ensure you have a camera connected and have granted permission.");
+            return false;
         }
     }
 

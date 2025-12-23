@@ -452,8 +452,14 @@ document.getElementById('eye-control-btn').addEventListener('click', async () =>
     const btn = document.getElementById('eye-control-btn');
     btn.innerText = "LOADING...";
     btn.disabled = true;
-    await eyeController.startCamera();
-    btn.innerText = "EYE CONTROL ENABLED";
+    const ok = await eyeController.startCamera();
+    if (ok) {
+        btn.innerText = "EYE CONTROL ENABLED";
+        btn.disabled = true;
+    } else {
+        btn.innerText = "EYE CONTROL FAILED (TAP TO RETRY)";
+        btn.disabled = false;
+    }
 });
 document.getElementById('next-level-btn').addEventListener('click', nextLevel);
 document.getElementById('retry-btn').addEventListener('click', retryLevel);

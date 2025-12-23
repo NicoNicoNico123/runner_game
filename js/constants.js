@@ -1,6 +1,10 @@
 export const GAME_WIDTH = 960;
 export const GAME_HEIGHT = 540;
 
+// Global gameplay speed tuning.
+// 1.0 = default speed, < 1.0 = slower, > 1.0 = faster.
+export const GAME_SPEED_MULTIPLIER = 0.75;
+
 export const STATE = {
     START: 0,
     PLAYING: 1,

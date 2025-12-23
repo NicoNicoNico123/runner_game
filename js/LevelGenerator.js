@@ -1,4 +1,4 @@
-import { GAME_HEIGHT, MAP_PATTERNS } from './constants.js';
+import { GAME_HEIGHT, MAP_PATTERNS, GAME_SPEED_MULTIPLIER } from './constants.js';
 
 export function generateLevel(levelConfig) {
     const platforms = [];
@@ -18,7 +18,7 @@ export function generateLevel(levelConfig) {
     
     let repeats = 15; // Default length
     if (levelConfig.duration) {
-        const speedPxPerSec = levelConfig.speed * 60; // Speed * 60fps
+        const speedPxPerSec = levelConfig.speed * GAME_SPEED_MULTIPLIER * 60; // Speed * 60fps (multiplied)
         const totalDist = speedPxPerSec * levelConfig.duration;
         const patternChunkLen = pattern[0].length * tileSize;
         repeats = Math.ceil(totalDist / patternChunkLen);

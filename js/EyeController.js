@@ -39,19 +39,69 @@ export class EyeController {
             return;
         }
 
-        // Create hidden video element
-        this.video = document.createElement('video');
-        this.video.style.display = 'none';
-        document.body.appendChild(this.video);
+        const cameraPanel = document.getElementById('camera-panel');
+        const preview = document.getElementById('cameraPreview');
+        if (!preview) {
+            console.error("cameraPreview element not found");
+            alert("Camera preview element missing from page.");
+            return;
+        }
+
+        // If already running, just ensure the panel is visible.
+        if (this.running && this.video && this.video.srcObject) {
+            if (cameraPanel) {
+                cameraPanel.classList.remove('hidden');
+                cameraPanel.setAttribute('aria-hidden', 'false');
+            }
+            return;
+        }
+
+        // Use the visible preview video element so mobile users can see the camera feed.
+        this.video = preview;
+        this.video.muted = true;
+        this.video.playsInline = true;
 
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            let stream;
+            try {
+                // Prefer front/selfie camera (works best for eye control).
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        facingMode: { ideal: 'user' },
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
+                    audio: false
+                });
+            } catch (constraintErr) {
+                // Many desktop/laptop webcams don't support facingMode constraints.
+                console.warn("getUserMedia constraints rejected, falling back to video:true", constraintErr);
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+            }
+
             this.video.srcObject = stream;
-            this.video.addEventListener("loadeddata", () => {
-                this.running = true;
-                this.predict();
-            });
-            this.video.play();
+
+            if (cameraPanel) {
+                cameraPanel.classList.remove('hidden');
+                cameraPanel.setAttribute('aria-hidden', 'false');
+            }
+
+            // Let the game rescale to the reduced top region immediately.
+            window.dispatchEvent(new Event('resize'));
+
+            // Start playback and prediction. Some browsers won't reliably fire `loadeddata`
+            // for srcObject streams, so don't depend on it.
+            try {
+                await this.video.play();
+            } catch (playErr) {
+                console.warn("video.play() was blocked or failed:", playErr);
+                // On some browsers, user interaction is required; the click that called
+                // startCamera() should satisfy that, but if not, the preview may remain paused.
+            }
+
+            this.lastVideoTime = -1;
+            this.running = true;
+            this.predict();
         } catch (e) {
             console.error("Error accessing webcam:", e);
             alert("Could not access webcam. Please ensure you have a camera connected and have granted permission.");
@@ -63,9 +113,19 @@ export class EyeController {
         if (this.video && this.video.srcObject) {
             const tracks = this.video.srcObject.getTracks();
             tracks.forEach(track => track.stop());
-            this.video.remove();
-            this.video = null;
+            this.video.srcObject = null;
         }
+
+        const cameraPanel = document.getElementById('camera-panel');
+        if (cameraPanel) {
+            cameraPanel.classList.add('hidden');
+            cameraPanel.setAttribute('aria-hidden', 'true');
+        }
+
+        // Let the game rescale to the expanded top region immediately.
+        window.dispatchEvent(new Event('resize'));
+
+        this.video = null;
     }
 
     async predict() {

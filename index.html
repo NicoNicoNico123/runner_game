@@ -9,61 +9,76 @@
 </head>
 <body>
 
-<div id="game-container">
-    <canvas id="gameCanvas" width="960" height="540"></canvas>
-    <div class="scanlines"></div>
+<div id="app">
+    <div class="game-region">
+        <div id="game-container">
+            <canvas id="gameCanvas" width="960" height="540"></canvas>
+            <div class="scanlines"></div>
 
-    <!-- UI Overlay -->
-    <div class="ui-layer">
-        <div id="hud" class="hidden">
-            <div id="city-name" style="color: var(--neon-blue); text-shadow: 2px 2px #d300c5;">TOKYO</div>
-            <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+            <!-- UI Overlay -->
+            <div class="ui-layer">
+                <div id="hud" class="hidden">
+                    <div id="city-name" style="color: var(--neon-blue); text-shadow: 2px 2px #d300c5;">TOKYO</div>
+                    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+                </div>
+            </div>
+
+            <!-- Start Screen -->
+            <div id="start-screen">
+                <div class="overlay-content">
+                    <h1>NEON GLIDE</h1>
+                    <h2>VAPOR CITY RUNNER</h2>
+                    <p>TAP or SPACE to Jump.</p>
+                    <p>Avoid solid traps and gaps.</p>
+                    <p id="incredible-trigger" style="cursor: pointer; user-select: none;">Collect the <span style="color:yellow">★</span> for INCREDIBLE MODE.</p>
+                    
+                    <div class="level-select-container hidden">
+                        <label for="level-select" style="font-size: 0.8rem; color: #aaa;">START LEVEL:</label>
+                        <select id="level-select" class="level-select">
+                            <option value="0">HONG KONG (Easy)</option>
+                            <option value="1">TOKYO (Medium)</option>
+                            <option value="2">PARIS (Hard)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn" id="start-btn">INSERT COIN</button>
+                    
+                    <button class="btn" id="eye-control-btn" style="font-size: 0.8rem; padding: 10px 20px; margin-top: 10px; background-color: #333;">ENABLE EYE CONTROL (BETA)</button>
+
+                    <button class="btn" id="leaderboard-btn" style="font-size: 0.8rem; padding: 10px 20px; margin-top: 10px;">LEADERBOARD</button>
+                </div>
+
+                <div id="leaderboard-container" class="hidden" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 20px; border: 2px solid var(--neon-blue); z-index: 100; min-width: 400px; box-shadow: 0 0 20px var(--neon-blue);">
+                    <h3 style="color: var(--neon-blue); margin-top: 0;">LEADERBOARD</h3>
+                    <div id="leaderboard-list" style="margin-bottom: 20px;">Loading...</div>
+                    <button class="btn" id="close-leaderboard-btn" style="font-size: 0.8rem; padding: 5px 10px;">CLOSE</button>
+                </div>
+            </div>
+
+            <!-- Level Complete Screen -->
+            <div id="level-complete-screen" class="hidden">
+                <div class="overlay-content">
+                    <h1 style="font-size: 3rem; color: #05d9e8; text-shadow: 0 0 20px #05d9e8;">CITY CLEARED</h1>
+                    <h2 id="next-city-name">NEXT: TOKYO</h2>
+                    <button class="btn" id="next-level-btn">TRAVEL</button>
+                </div>
+            </div>
+
+            <!-- Game Over Screen -->
+            <div id="game-over-screen" class="hidden">
+                <div class="overlay-content">
+                    <h1 style="font-size: 3rem; color: red; text-shadow: 0 0 20px red;">SYSTEM CRASH</h1>
+                    <p class="blink">CONNECTION LOST</p>
+                    <button class="btn" id="retry-btn">AGAIN</button>
+                    <button class="btn" id="back-to-start-btn">Return Start Screen</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Start Screen -->
-    <div id="start-screen">
-        <h1>NEON GLIDE</h1>
-        <h2>VAPOR CITY RUNNER</h2>
-        <p>TAP or SPACE to Jump.</p>
-        <p>Avoid solid traps and gaps.</p>
-        <p id="incredible-trigger" style="cursor: pointer; user-select: none;">Collect the <span style="color:yellow">★</span> for INCREDIBLE MODE.</p>
-        
-        <div class="level-select-container hidden">
-            <label for="level-select" style="font-size: 0.8rem; color: #aaa;">START LEVEL:</label>
-            <select id="level-select" class="level-select">
-                <option value="0">HONG KONG (Easy)</option>
-                <option value="1">TOKYO (Medium)</option>
-                <option value="2">PARIS (Hard)</option>
-            </select>
-        </div>
-
-        <button class="btn" id="start-btn">INSERT COIN</button>
-        
-        <button class="btn" id="eye-control-btn" style="font-size: 0.8rem; padding: 10px 20px; margin-top: 10px; background-color: #333;">ENABLE EYE CONTROL (BETA)</button>
-
-        <button class="btn" id="leaderboard-btn" style="font-size: 0.8rem; padding: 10px 20px; margin-top: 10px;">LEADERBOARD</button>
-
-        <div id="leaderboard-container" class="hidden" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.95); padding: 20px; border: 2px solid var(--neon-blue); z-index: 100; min-width: 400px; box-shadow: 0 0 20px var(--neon-blue);">
-            <h3 style="color: var(--neon-blue); margin-top: 0;">LEADERBOARD</h3>
-            <div id="leaderboard-list" style="margin-bottom: 20px;">Loading...</div>
-            <button class="btn" id="close-leaderboard-btn" style="font-size: 0.8rem; padding: 5px 10px;">CLOSE</button>
-        </div>
-    </div>
-
-    <!-- Level Complete Screen -->
-    <div id="level-complete-screen" class="hidden">
-        <h1 style="font-size: 3rem; color: #05d9e8; text-shadow: 0 0 20px #05d9e8;">CITY CLEARED</h1>
-        <h2 id="next-city-name">NEXT: TOKYO</h2>
-        <button class="btn" id="next-level-btn">TRAVEL</button>
-    </div>
-
-    <!-- Game Over Screen -->
-    <div id="game-over-screen" class="hidden">
-        <h1 style="font-size: 3rem; color: red; text-shadow: 0 0 20px red;">SYSTEM CRASH</h1>
-        <p class="blink">CONNECTION LOST</p>
-        <button class="btn" id="retry-btn">AGAIN</button>
-        <button class="btn" id="back-to-start-btn">Return Start Screen</button>
+    <div id="camera-panel" class="hidden" aria-hidden="true">
+        <div class="camera-title">CAMERA</div>
+        <video id="cameraPreview" autoplay playsinline muted></video>
     </div>
 </div>
 

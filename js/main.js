@@ -1,4 +1,4 @@
-import { GAME_WIDTH, GAME_HEIGHT, STATE, LEVELS } from './constants.js';
+import { GAME_WIDTH, GAME_HEIGHT, STATE, LEVELS, GAME_SPEED_MULTIPLIER } from './constants.js';
 import { Player } from './Player.js';
 import { Camera } from './Camera.js';
 import { particles, createParticles } from './Particle.js';
@@ -10,6 +10,9 @@ import { EyeController } from './EyeController.js';
 
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d', { alpha: false });
+
+const gameContainer = document.getElementById('game-container');
+const gameRegion = document.querySelector('.game-region');
 
 // Input State
 let inputActive = false;
@@ -32,8 +35,78 @@ const eyeController = new EyeController(() => {
 // Init Eye Controller (load model)
 eyeController.init();
 
+function setBarBackgroundForLevel(levelIndex) {
+    const cfg = LEVELS[levelIndex] || LEVELS[0];
+    const colors = cfg?.bgColors || ['#000814', '#120b29', '#001e42'];
+    document.documentElement.style.setProperty('--bar-bg-a', colors[0] || '#000814');
+    document.documentElement.style.setProperty('--bar-bg-b', colors[1] || colors[0] || '#120b29');
+    document.documentElement.style.setProperty('--bar-bg-c', colors[2] || colors[1] || colors[0] || '#001e42');
+}
+
+function resizeLayout() {
+    if (!gameContainer || !gameRegion) return;
+
+    // Measure available space in the top region
+    const rect = gameRegion.getBoundingClientRect();
+    const availW = Math.max(1, rect.width);
+    const availH = Math.max(1, rect.height);
+
+    // Target a square viewport (1:1) that fits the available region.
+    // This makes the game appear "zoomed in" in landscape (square fills height, crops sides).
+    const EDGE_GUTTER_PX = 0; // increase if you want breathing room around the square
+    const size = Math.floor(Math.min(availW, availH) - EDGE_GUTTER_PX);
+    const w = Math.max(1, size);
+    const h = Math.max(1, size);
+
+    gameContainer.style.width = `${w}px`;
+    gameContainer.style.height = `${h}px`;
+
+    // Match the canvas backing store to the displayed size (for crisp rendering).
+    // Note: CSS controls the on-screen size (100% of container).
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const pxW = Math.max(1, Math.floor(w * dpr));
+    const pxH = Math.max(1, Math.floor(h * dpr));
+    if (canvas.width !== pxW) canvas.width = pxW;
+    if (canvas.height !== pxH) canvas.height = pxH;
+    ctx.imageSmoothingEnabled = false;
+
+    fitVisibleOverlays();
+}
+
+function fitVisibleOverlays() {
+    if (!gameContainer) return;
+
+    const containerRect = gameContainer.getBoundingClientRect();
+    const containerW = Math.max(1, containerRect.width);
+    const containerH = Math.max(1, containerRect.height);
+
+    const overlayIds = ['start-screen', 'game-over-screen', 'level-complete-screen'];
+    for (const id of overlayIds) {
+        const el = document.getElementById(id);
+        if (!el || el.classList.contains('hidden')) continue;
+
+        const content = el.querySelector('.overlay-content');
+        if (!content) continue;
+
+        // Reset first so measurements reflect natural size.
+        el.style.setProperty('--overlay-scale', '1');
+
+        // scrollHeight/scrollWidth represent the full content size even if overflow is hidden.
+        const contentW = Math.max(1, content.scrollWidth);
+        const contentH = Math.max(1, content.scrollHeight);
+
+        // Leave a tiny breathing room to avoid edge clipping.
+        const scaleW = (containerW - 24) / contentW;
+        const scaleH = (containerH - 24) / contentH;
+        const s = Math.max(0.5, Math.min(1, scaleW, scaleH));
+
+        el.style.setProperty('--overlay-scale', String(s));
+    }
+}
+
 function initLevel() {
     const config = LEVELS[currentLevelIndex];
+    setBarBackgroundForLevel(currentLevelIndex);
     
     // Update UI
     document.getElementById('city-name').innerText = `${config.name} - ${config.sub}`;
@@ -43,7 +116,7 @@ function initLevel() {
     levelData = generateLevel(config);
     
     // Reset Player
-    player.reset(config.speed);
+    player.reset(config.speed * GAME_SPEED_MULTIPLIER);
     
     camera.x = 0;
     // Clear particles
@@ -62,6 +135,10 @@ function die() {
     currentState = STATE.GAME_OVER;
     document.getElementById('game-over-screen').classList.remove('hidden');
     document.getElementById('hud').classList.add('hidden');
+    // Ensure overlay content scales to fit the (possibly reduced) game area on mobile.
+    fitVisibleOverlays();
+    // Switch back to contain sizing (non-playing).
+    resizeLayout();
 }
 
 function levelComplete() {
@@ -86,6 +163,10 @@ function levelComplete() {
     
     document.getElementById('level-complete-screen').classList.remove('hidden');
     document.getElementById('hud').classList.add('hidden');
+    // Ensure overlay content scales to fit the (possibly reduced) game area on mobile.
+    fitVisibleOverlays();
+    // Switch back to contain sizing (non-playing).
+    resizeLayout();
 }
 
 function update(dt) {
@@ -208,8 +289,34 @@ function drawWorld() {
 }
 
 function draw() {
-    // Clear
-    ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    // Clear in canvas pixel space
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Render the 960x540 game world into the (square) canvas using "cover" scaling:
+    // fill the square, but bias the crop so the player stays visible (crop mostly on the right).
+    const scaleX = canvas.width / GAME_WIDTH;
+    const scaleY = canvas.height / GAME_HEIGHT;
+    const scale = Math.max(scaleX, scaleY);
+    const renderedW = GAME_WIDTH * scale;
+    const renderedH = GAME_HEIGHT * scale;
+
+    // Clamp helper (avoid showing outside the rendered world area).
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+    // Bias horizontal framing so the player (kept near the left quarter by Camera.js)
+    // is always on-screen even when the square viewport crops the sides.
+    const playerScreenX = (player?.x ?? 0) - (camera?.x ?? 0); // world-space within the 960x540 frame
+    const desiredPlayerX = canvas.width * 0.18; // 18% from left edge
+    const rawOffsetX = desiredPlayerX - (playerScreenX * scale);
+
+    const minOffsetX = canvas.width - renderedW; // align-right
+    const maxOffsetX = 0; // align-left
+    const offsetX = clamp(rawOffsetX, minOffsetX, maxOffsetX);
+
+    // Vertical can stay centered (usually no vertical crop in the square case anyway).
+    const offsetY = (canvas.height - renderedH) / 2;
+    ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
 
     // Background
     drawBackground(ctx, camera, currentLevelIndex, GAME_WIDTH, GAME_HEIGHT, frameCount);
@@ -246,8 +353,10 @@ function gameLoop(timestamp) {
 function startGame() {
     const selector = document.getElementById('level-select');
     currentLevelIndex = parseInt(selector.value, 10) || 0;
+    setBarBackgroundForLevel(currentLevelIndex);
     initLevel();
     currentState = STATE.PLAYING;
+    resizeLayout(); // apply height-fit gameplay sizing
     startTime = Date.now();
     totalElapsedTime = 0; // Reset total time on fresh start
     document.getElementById('start-screen').classList.add('hidden');
@@ -276,6 +385,7 @@ function nextLevel() {
     if (currentLevelIndex < LEVELS.length) {
         initLevel();
         currentState = STATE.PLAYING;
+        resizeLayout(); // apply height-fit gameplay sizing
         document.getElementById('level-complete-screen').classList.add('hidden');
         document.getElementById('hud').classList.remove('hidden');
     }
@@ -284,6 +394,7 @@ function nextLevel() {
 function retryLevel() {
     initLevel(); // Restart current
     currentState = STATE.PLAYING;
+    resizeLayout(); // apply height-fit gameplay sizing
     // Do NOT reset timer. "Even Again still count in it"
     document.getElementById('game-over-screen').classList.add('hidden');
     document.getElementById('hud').classList.remove('hidden');
@@ -296,6 +407,8 @@ function backToStart() {
     document.getElementById('game-over-screen').classList.add('hidden');
     document.getElementById('start-screen').classList.remove('hidden');
     document.getElementById('hud').classList.add('hidden');
+    fitVisibleOverlays();
+    resizeLayout(); // ensure contain sizing for start screen
 }
 
 function toggleLeaderboard() {
@@ -358,4 +471,8 @@ document.getElementById('incredible-trigger').addEventListener('click', () => {
 });
 
 // Start Loop
+setBarBackgroundForLevel(0);
+resizeLayout();
+window.addEventListener('resize', resizeLayout);
+window.addEventListener('orientationchange', resizeLayout);
 requestAnimationFrame(gameLoop);
